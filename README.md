@@ -1,2 +1,2 @@
 # mCMT
-CUBRID migration tool from Altibase, Tibero.
+CUBRID migration tool for Altibase, Tibero, DB2.
