@@ -1020,7 +1020,8 @@ public class mCMT {
 	
 		String	seqName = null;
 		long	seqCurrent, seqIncrement, seqStart;
-		long	seqMin, seqMax;
+		long	seqMin = -1, seqMax = 0;
+		String	seqCurrent_str = "0", seqMax_str = "0"; // DB2의 경우 long 을 초과하는 값이 있어 string 으로 조정
 		String	isCycle; 
 //		int		cacheSize = 0;
 		int		seqIsNull = 0;
@@ -1072,7 +1073,11 @@ public class mCMT {
 					seqCurrent = rs.getLong("current_seq");
 					seqIncrement = rs.getLong("increment_seq");
 					seqMin = rs.getLong("min_seq");
-					seqMax = rs.getLong("max_seq");
+					if (srcDB.equals("db2")) {
+						seqMax_str = rs.getString("max_seq");
+					} else {
+						seqMax = rs.getLong("max_seq");
+					}
 					isCycle = rs.getString("is_cycle");
 //					cacheSize = rs.getInt("cache_size");
 					seqIsNull = rs.getInt("seq_isnull");
@@ -1117,24 +1122,28 @@ public class mCMT {
 							sql = "select (next value for " + seqName + ") current_seq from sysibm.dual";
 							rs0 = stmt0.executeQuery(sql);
 							if (rs0.next()) {
-								seqCurrent = rs0.getLong("current_seq");
+								seqCurrent_str = rs0.getString("current_seq");
 							}
 							rs0.close();
 						} catch (SQLException e) {
 							if (e.getErrorCode() == -359) // max 값에 도달했으며, nocycle 이어서 에러 발생.
-								seqCurrent = seqMax;
+								seqCurrent_str = seqMax_str;
 							rs0.close();
 						}
 					}
 					
+					if (!srcDB.equals("db2")) { // db2 가 max seq 가 long 값을 넘어서서 string 으로 변경.
+						seqCurrent_str = seqCurrent + "";
+						seqMax_str = seqMax + "";
+					}
 					bw.write("create serial [" + seqName.toLowerCase() + "]");
-					bw.write(" start with " + seqCurrent);
+					bw.write(" start with " + seqCurrent_str);
 					bw.write(" increment by " + seqIncrement);
 					bw.write(" minvalue " + seqMin);
 					if (!(srcDB.equals("aitibase") && seqMax == 9223372036854775806l) // altibase max 기본값
 						&& !(srcDB.equals("tibero") && seqMax == 9223372036854775807l) // tibero max 기본값
-						&& !(srcDB.equals("db2") && seqMax == 2147483647)) // db2 max 기본값
-						bw.write(" maxvalue " + seqMax);
+						&& !(srcDB.equals("db2") && seqMax_str.equals("2147483647"))) // db2 max 기본값
+						bw.write(" maxvalue " + seqMax_str);
 					if (isCycle.equals("YES"))
 						bw.write(" cycle");
 					else
