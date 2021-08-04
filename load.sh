@@ -11,7 +11,7 @@ F_LIST=`ls -1 *.data`
 DT=`date +%m%d`
 mkdir OK.$DT
 
-for F_NAME in ${F_LIST[@]}
+for F_NAME in ./*.data
 do
         echo "   -----> DB:$DB_NAME USER:$DB_USER PW:$DB_PW file: $F_NAME"
         cubrid loaddb -u $DB_USER -p $DB_PW -v -l -c 10000 -d $F_NAME $DB_NAME
