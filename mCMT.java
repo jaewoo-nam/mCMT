@@ -4,6 +4,7 @@
  * Created by JWNAM on 2019-8-9 for ORALCE. But currently not supported.
  * Modified by JWNAM on 2020-9,10,11 for Altibase, Tibero.
  * Modified by JWNAM on 2021-05 for DB2.
+ * Modified by JWNAM on 2021-08 for sequence, comment of DB2.
  * 
  * Copyright 2019~ CUBRID. All Rights Reserved.
  */
@@ -84,6 +85,8 @@ class TableInfo implements Comparable<TableInfo> {
 }
 
 public class mCMT {
+	static String			versionStr = "20210805";
+	
 	static int				RECORD_LIMIT = 5000;  // 이 건수를 초과하고 blob 가 있는 경우 별도의 blob file 을 만들 수 있음.
 	static int				MAX_STRING_LENGTH = 70; // unloaddb objects 와 동일한 길이
 	static int				MAX_BUFFER_SIZE = MAX_STRING_LENGTH * 100;
@@ -95,8 +98,6 @@ public class mCMT {
 	
 	static String			outputDir = ".";
 	static String			outputPrefix = null;
-	
-	static String			versionStr = "20210531";
 	
 	static String			srcIP = null;
 	static String			srcDB = null;
@@ -692,6 +693,7 @@ public class mCMT {
 		String	columnDefault = null;
 		String	defaultValue = null;
 		String	columnIsnull = null;
+		String	columnComment = null;
 		
 		int		userId = 0;
 		int		tableId = 0;
@@ -702,12 +704,14 @@ public class mCMT {
 			if (srcDB.equals("tibero")) {
 				sql = "select column_id, column_name, -999 user_id, -999 table_id";
 				sql += ", data_type, data_length, data_precision, data_scale";
-				sql += ", nullable, data_default"; 
-				sql += " from all_tab_columns";
+				sql += ", nullable, data_default";
+				sql += ", (select comments from all_col_comments";
+				sql += "    where owner = c.owner and table_name = c.table_name and column_name = c.column_name) comments";
+				sql += " from all_tab_columns c";
 				sql += " where owner = '" + srcDBuser + "' and table_name = '" + tableName + "'";
 				sql += " order by column_id";
 			} else if (srcDB.equals("altibase")) {
-				sql = "select c.column_id, c.column_name, u.user_id, t.table_id";
+				sql = "select c.column_id, c.column_name, c.remarks, u.user_id, t.table_id";
 				sql += "      , case c.data_type when  1 then 'CHAR'";
 				sql += "                         when 12 then 'VARCHAR'";
 				sql += "                         when -8 then 'NCHAR'";
@@ -729,6 +733,8 @@ public class mCMT {
 				sql += "                         when 10003 then 'GEOMETRY' end data_type";
 				sql += "      , c.precision data_length, c.precision data_precision, c.scale data_scale";
 				sql += "      , decode(c.is_nullable, 'F', 'N', 'Y') nullable, c.default_val data_default"; 
+				sql += ", (select comments from system_.sys_comments_";
+				sql += "    where user_name = u.user_name and table_name = t.table_name and column_name = c.column_name) comments";
 				sql += " from system_.sys_tables_ t, system_.sys_users_ u, system_.sys_columns_ c";
 				sql += " where u.user_name = '" + srcDBuser + "' and t.table_name = '" + tableName + "'";
 				sql += "  and t.user_id = u.user_id";
@@ -741,6 +747,7 @@ public class mCMT {
 				sql = "select colno column_id, colname column_name, -999 user_id, -999 table_id";
 				sql += "   , typename data_type ,length data_length ,length data_precision ,scale data_scale";
 				sql += "   , nulls nullable, default data_default";
+				sql += ", remarks comments";
 				sql += " from syscat.columns"; 
 				sql += " where tabname = '" + tableName + "'";
 				sql += "   and tabschema = (select tabschema from syscat.tables"; 
@@ -767,6 +774,9 @@ public class mCMT {
 			
 				columnIsnull = rs.getString("nullable");		
 				columnDefault = rs.getString("data_default"); // 문자형에 대한 default 가 상수일경우 ' 를 포함하고 있다. ' 가 없으면 함수로 볼 수 있음.
+				
+				columnComment = rs.getString("comments");
+				if (rs.wasNull()) columnComment = null;
 				
 				if (srcDB.equals("altibase") && dataType.equals("BYTE")) {
 					columnId = rs.getInt("column_id");
@@ -814,6 +824,9 @@ public class mCMT {
 					makeCheckList("Default", tableName + "(" + columnName + " " + columnType + ") " + columnDefault + " -> " + defaultValue);
 				}
 				
+				if (columnComment != null)
+					columnInfo += " comment '" + columnComment + "'";
+				
 				ColumnList.add(columnInfo);
 			} // while (rs.next()) ;
 				
@@ -834,6 +847,54 @@ public class mCMT {
 		return columnCount;
 	}
 
+	public static String getCommentOfTable(String tableName) {
+		Statement	stmt = null;
+		ResultSet	rs = null;
+		String		sql = null;
+				
+		String		tableComment = null;
+		
+		try {
+			stmt = DBconn.createStatement();
+				
+			if (srcDB.equals("altibase")) {
+				sql = "select comments from system_.sys_comments_";
+				sql += " where table_name = '" + tableName + "'";
+				sql += "   and user_name = '" + srcDBuser + "'";
+				sql += "   and column_name is null";			
+			} else if (srcDB.equals("tibero")) {
+				sql = "select comments from all_tab_comments";
+				sql += " where table_name = '" + srcDBuser + "'";
+				sql += "   and owner = '" + srcDBuser + "'";
+			} else if (srcDB.equals("db2")) {
+				sql = "select remarks comments from syscat.tables";
+				sql += " where tabname = '" + tableName + "'";
+				sql += "   and owner = '" + srcDBuser + "'";
+			}
+			
+			rs = stmt.executeQuery(sql);
+			if (rs.next()) {
+				tableComment = rs.getString("comments");
+				if (rs.wasNull())
+					tableComment = null;
+			}
+			
+			rs.close();
+			stmt.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (rs != null) rs.close();
+				if (stmt != null) stmt.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return tableComment;	
+	}
+
 /*
  * table 정보를 가져옴. column 속성을 먼저 가져오고, key, unique, index 정보를 다음에 가져옴
  * DDL (create table) 생성
@@ -844,6 +905,7 @@ public class mCMT {
 		int		i = 0;
 		int		keyCnt = 0, columnCnt = 0;
 		boolean	hasLob = false;
+		String	tableComment = null;
 		
 		ArrayList<String>	ColumnList = new ArrayList<String>();
 
@@ -870,8 +932,13 @@ public class mCMT {
 					if (!hasLob && ColumnList.get(i).matches("(.*)" + LOB_TYPE + "(.*)"))
 						hasLob = true;
 				}
-				bw.write(");");
+				bw.write(")");
 			}
+			
+			if ((tableComment = getCommentOfTable(tableName)) != null)
+				bw.write(" comment '" + tableComment + "'");
+			bw.write(";");
+			
 			bw.newLine();
 			bw.flush();
 			
