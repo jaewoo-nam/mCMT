@@ -23,16 +23,16 @@ CUBRID migration tool for Altibase, Tibero, DB2.
 
 * 실행예) altibase, DB서버: localhost 접속port: 기본포트,  db명: adb, 사용자ID: dbuser, 사용자암호: dbpw, AS-IS 문자셑: ksc5601, TO-BE 문자셑: utf8
    - 스키마만 받고, AS-IS 문자셋이 ksc5601 이었고, 이를 utf8 로 변환하여 받음.
-     $java -cp ./mCMT.jar;\altibase6.5\altibase.jar mCMT/mCMT -s a localhost 0 adb dbuser dbpw ksc5601 utf8
+     $java -cp ./mCMT.jar:/altibase6.5/altibase.jar mCMT/mCMT -s a localhost 0 adb dbuser dbpw ksc5601 utf8
    - /output 아래 결과 화일 저정
-     $java -cp ./mCMT.jar;\altibase6.5\altibase.jar mCMT/mCMT a localhost 0 adb dbuser dbpw ksc5601 utf8 -p /output 
+     $java -cp ./mCMT.jar:/altibase6.5/altibase.jar mCMT/mCMT a localhost 0 adb dbuser dbpw ksc5601 utf8 -p /output 
    - table.list 에 저장된 테이블에 대하여만 데이터 받음
-     $java -cp ./mCMT.jar;\altibase6.5\altibase.jar mCMT/mCMT -d a localhost 0 adb dbuser dbpw ksc5601 utf8 table.list
+     $java -cp ./mCMT.jar:/altibase6.5/altibase.jar mCMT/mCMT -d a localhost 0 adb dbuser dbpw ksc5601 utf8 table.list
    - 데이터가 많아 동시에 받고자 하는 경우
      - 일단 -s 옵션을 이용하여 스키마만 받음. 
        결과를 보면 <IP뒷자리>_<DB명>_<사용자명>.table_1.list, ... <IP뒷자리>_<DB명>_<사용자명>.table_5.list 화일이 만들어져 있음. 이것을 이용하여 데이터 export 수행.
      - telnet 창을 5개를 띄운후 동시 실행. 각 창마다 테이블 목록 화일 번호만 다르게 하면 됨.
-       $java -cp ./mCMT.jar;\altibase6.5\altibase.jar mCMT/mCMT -d a localhost 0 adb dbuser dbpw ksc5601 utf8 <IP뒷자리>_<DB명>_<사용자명>.table_1.list
+       $java -cp ./mCMT.jar:\altibase6.5\altibase.jar mCMT/mCMT -d a localhost 0 adb dbuser dbpw ksc5601 utf8 <IP뒷자리>_<DB명>_<사용자명>.table_1.list
 
  * 화면출력 예
      --- mCMT(v.20210531) will be export from ALTIBASE-localhost.adb(ksc5601).DBUSER/dbpw to CUBRID(utf8)
